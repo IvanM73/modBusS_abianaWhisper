@@ -1,0 +1,281 @@
+# Example configuration.ya lo ml entry for a TCP connection
+modbus:
+  name: modbus1
+  type: rtuovertcp
+  host: 192.168.1.143
+  port: 502
+  #close_comm_on_error: true
+  # retries: 3
+  timeout: 5
+  delay: 2
+
+  #NOME FANCOIL : fc_TavernettaIngresso
+  #slave: 1
+
+  climates:
+    - name: fc_test
+      slave: 1
+      address: 4098 # 1002Ex current_temp_register
+      scan_interval: 15
+      scale: 0.1
+      precision: 2
+      max_temp: 22
+      min_temp: 10
+      target_temp_register: 4139
+      #hvac_mode_register:
+      hvac_onoff_register: 4105
+
+  sensors:
+    - name: "fc_test_dump"
+      unique_id: "fc_test_dump"
+      scan_interval: 10
+      slave: 1
+      address: 4105
+      count: 12
+      data_type: custom
+      structure: ">12h"
+
+    - name: "fc_test_T3_Attuale (H-1002)" #T3
+      unique_id: "fc_test_T3_Attuale"
+      scan_interval: 10
+      slave: 1
+      address: 4098 # 1002 Esadecimale: current_temp_register
+      data_type: int16
+      scale: 0.1
+      precision: 1
+      device_class: temperature
+
+    - name: "fc_test_T1_Radiatore (H-1004)" #T1
+      unique_id: "fc_test_T1_Radiatore"
+      scan_interval: 10
+      slave: 1
+      address: 4100 # 1004 Esadecimale: Temperature probe T3
+      data_type: int16
+      scale: 0.1
+      precision: 1
+      device_class: temperature
+
+    - name: "fc_test_T_Target_Summer (H-102A)"
+      unique_id: "fc_test_TargetSummer"
+      scan_interval: 10
+      slave: 1
+      address: 4138 # 102A Esadecimale  LSI Summer set-point
+      data_type: int16
+      scale: 0.1
+      precision: 1
+      device_class: temperature
+
+    - name: "fc_test_T_Target_Winter (H-102B)"
+      unique_id: "fc_test_TargetWinter"
+      scan_interval: 10
+      slave: 1
+      address: 4139 # 102B
+      data_type: int16
+      scale: 0.1
+      precision: 1
+      device_class: temperature
+
+    - name: "fc_test_Machine state (H-1009) 0:OFF, 1:ON"
+      unique_id: "fc_test_State"
+      scan_interval: 10
+      slave: 1
+      address: 4105 # 1009
+      data_type: int16
+
+    - name: "fc_test_Fan Only mode (H-100A) 0:OFF, 1:ON"
+      unique_id: "fc_test_FanOnly"
+      scan_interval: 10
+      slave: 1
+      address: 4106 # 100A
+      data_type: int16
+
+    - name: "fc_test_Season in use (H-100D) o: Summer 1:Winter"
+      unique_id: "fc_test_Season"
+      scan_interval: 10
+      slave: 1
+      address: 4109 # 100D
+      data_type: int16
+
+    - name: "fc_test_Night mode (H-1011) 0: Not Active 1:Active"
+      unique_id: "fc_test_NightMode"
+      scan_interval: 10
+      slave: 1
+      address: 4113 # 1011
+      data_type: int16
+
+    - name: "fc_test_State of Automatic Ventilation(H-1019) 0: OFF 1:ON"
+      unique_id: "fc_test_VentilationAuto"
+      scan_interval: 10
+      slave: 1
+      address: 4121 # 1019
+      data_type: int16
+
+    - name: "fc_test_fanspeed (H-1025) 0-10"
+      unique_id: "fc_test_FanSpeed"
+      scan_interval: 10
+      slave: 1
+      scale: 0.1
+      address: 4133 # 1025 Ex
+      data_type: int16
+
+    - name: "fc_test_Electrovalve (H-1020) 0=Off,1=on"
+      unique_id: "fc_test_ElectroValve"
+      scan_interval: 10
+      slave: 1
+      address: 4128 # 1020 Esadecimale:
+      data_type: int16
+
+    - name: "fc_test Thermoregulation requested (H-100F) 0=Off,1=on"
+      unique_id: "fc_test_ThermoregulationRequested"
+      scan_interval: 10
+      slave: 1
+      address: 4111 # 100F Esadecimale:
+      data_type: int16
+
+climate:
+  - platform: climate_template
+    name: fc_test_climateTemplate
+    unique_id: fc_test_climateTemplate
+    modes:
+      - "off"
+      - "heat"
+      - "cool"
+      - "fan_only"
+
+    fan_modes : ["v1","v2","v3","v4","v5","v6","v7","v8","v9","v10"]
+
+    min_temp: 10
+    max_temp: 30
+    temp_step: 0.5
+    precision: 0.1
+
+    current_temperature_template: "{{ (states('sensor.fc_test_t3_attuale_h_1002')|float )  }}"
+    target_temperature_template: "{{ (states('sensor.fc_test_t_target_winter_h_102b')|float )  }}"
+
+    hvac_action_template: >
+      {% if not is_state('sensor.fc_test_electrovalve_h_1020_0_off_1_on', '0') %}
+        {% if not is_state('sensor.fc_test_fanspeed_h_1025_0_10', '0') %}
+          {% if is_state('sensor.fc_test_machine_state_h_1009_0_off_1_on', '0') %}
+            off
+          {% elif is_state('sensor.fc_test_fan_only_mode_h_100a_0_off_1_on', '1') %}
+            fan_only
+          {% elif is_state('sensor.fc_test_season_in_use_h_100d_o_summer_1_winter', '1') %}
+            heating
+          {% elif is_state('sensor.fc_test_season_in_use_h_100d_o_summer_1_winter', '0') %}
+            cooling
+          {% endif %}
+        {% else %}
+          idle
+        {% endif %}
+      {% else %}
+          off
+      {% endif %}
+
+    hvac_mode_template: >
+      {% if is_state('sensor.fc_test_machine_state_h_1009_0_off_1_on', '0') %}
+        off
+      {% elif is_state('sensor.fc_test_fan_only_mode_h_100a_0_off_1_on', '1') %}
+        fan_only
+      {% elif is_state('sensor.fc_test_season_in_use_h_100d_o_summer_1_winter', '1') %}
+        heat
+      {% elif is_state('sensor.fc_test_season_in_use_h_100d_o_summer_1_winter', '0') %}
+        cool
+      {% endif %}
+
+    fan_mode_template: >
+          {% if is_state('sensor.fc_test_fanspeed_h_1025_0_10', '0') %}
+            v0
+          {% elif is_state('sensor.fc_test_fanspeed_h_1025_0_10', '1') %}
+            v1
+          {% elif is_state('sensor.fc_test_fanspeed_h_1025_0_10', '2') %}
+            v2
+          {% elif is_state('sensor.fc_test_fanspeed_h_1025_0_10', '3') %}
+            v3
+          {% elif is_state('sensor.fc_test_fanspeed_h_1025_0_10', '4') %}
+            v4
+          {% elif is_state('sensor.fc_test_fanspeed_h_1025_0_10', '5') %}
+            v5
+          {% elif is_state('sensor.fc_test_fanspeed_h_1025_0_10', '6') %}
+            v6
+          {% elif is_state('sensor.fc_test_fanspeed_h_1025_0_10', '7') %}
+            v7
+          {% elif is_state('sensor.fc_test_fanspeed_h_1025_0_10', '8') %}
+            v8
+          {% elif is_state('sensor.fc_test_fanspeed_h_1025_0_10', '9') %}
+            v9
+          {% elif is_state('sensor.fc_test_fanspeed_h_1025_0_10', '10') %}
+            v10
+          {% endif %}
+
+    set_temperature:
+      service: modbus.write_register
+      data:
+        value: "{{ temperature*10 }}"
+        hub: modbus1
+        address: 4139 #Winter Setpoint 102B
+        slave: 1
+
+    set_hvac_mode:
+      service: script.test_set_hvac_mode
+      data:
+        hvac_mode: "{{ hvac_mode }}"
+    
+    set_fan_mode:
+      service: modbus.write_register
+      data:
+        value: "{{ fan_mode[1:] }}0"
+        #value: 70
+        hub: modbus1
+        address: 4195 # 1063 ex
+        slave: 1
+
+  
+
+script:
+  test_set_hvac_mode:
+    alias: "Implement  set_hvac_mode"
+    fields:
+      hvac_mode:
+        description: "HVAC mode setting"
+        example: "off"
+        required: true
+    sequence:
+      - choose:
+          ####  hvac_mode == 'off' ####
+          - conditions:
+              - condition: template
+                value_template: "{{ hvac_mode == 'off' }}"
+            sequence:
+              - action: script.1714648083285
+                data:
+                  message: "Turn the fancoil off "
+              # Turn the fancoil off #1054 ON-OFF command 
+              - action: modbus.write_register
+                data:
+                  value: 0
+                  address: 4180 # 1054
+                  hub: modbus1
+#              - action: homeassistant.update_entity
+#                target:
+#                  entity_id:
+#                    - sensor.sensor.fc_test_machine_state_h_1009_0_off_1_on
+            
+            
+          ####  hvac_mode == 'heat' ####
+          - conditions:
+              - condition: template
+                value_template: "{{ hvac_mode == 'heat' }}"
+            sequence:
+              # Turn the fancoil off #1054 ON-OFF command 
+              - action: modbus.write_register
+                data:
+                  value: 1
+                  address: 4180 # 1054
+                  hub: modbus1
+
+              # Set Season to winter  #1055 Mode command 0=Summer,1=Winter,2=Only Ventilation
+              - action: modbus.write_register
+                data:
+                  value: 1
+                  address: 4181 # 1055
+                  hub: modbus1
